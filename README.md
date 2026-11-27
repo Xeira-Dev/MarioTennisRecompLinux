@@ -74,6 +74,17 @@ Requirements: Visual Studio 2022+ Build Tools, LLVM/clang-cl, CMake, Ninja, Pyth
 
 Technical notes on how the port works are in [NOTES.md](NOTES.md).
 
+## Building (Linux)
+Requirements: GCC 10+, CMake, Ninja, Python 3, Git, Vulkan SDK (glslangValidator), Freetype development headers.
+
+1. Install dependencies (Fedora example): `sudo dnf install gcc-c++ cmake ninja-build python3 vulkan-loader-devel freetype-devel`
+2. Clone [Zelda64Recomp](https://github.com/Zelda64Recomp/Zelda64Recomp) with `--recursive` and make a
+   `lib` link in this folder pointing at its `lib` folder (it provides RT64, RmlUi, N64ModernRuntime and friends).
+3. Apply the patches in `patches/` to `lib/N64ModernRuntime`, `lib/N64ModernRuntime/N64Recomp` and `lib/rt64`.
+4. Build the engines: `./tools/build_engines.sh`.
+5. Generate the recompiled code from your ROM: `sh tools/recompile.sh "<path to Mario Tennis (USA).z64>"`.
+6. Build the game: `./tools/build_game.sh`. The result is in the `build` folder. Run it with this folder as the working directory.
+
 ## Credits
 - N64Recomp, N64ModernRuntime and the Zelda64Recomp frontend, by Wiseguy and contributors (GPL-3.0).
 - RT64 by Darío and contributors.
