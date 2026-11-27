@@ -12,6 +12,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+find_package(SDL2 REQUIRED)
+find_package(Threads REQUIRED)
+find_package(Freetype REQUIRED)
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    find_package(Vulkan REQUIRED)
+endif()
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-everything /W4")
 endif()
@@ -179,7 +186,7 @@ target_include_directories(MarioTennisRecompiled PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/rt64/src
     ${CMAKE_SOURCE_DIR}/lib/rt64/src/rhi
     ${CMAKE_SOURCE_DIR}/lib/rt64/src/render
-    ${CMAKE_SOURCE_DIR}/lib/freetype-windows-binaries/include
+    ${FREETYPE_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib/nativefiledialog-extended/src/include
     ${CMAKE_SOURCE_DIR}/lib/SlotMap
     ${CMAKE_BINARY_DIR}/shaders
@@ -187,16 +194,13 @@ target_include_directories(MarioTennisRecompiled PRIVATE
 )
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-    target_compile_options(MarioTennisRecompiled PRIVATE
-        -march=nehalem
-        -fno-strict-aliasing
-        -fms-extensions
-    )
-else()
-    target_compile_options(MarioTennisRecompiled PRIVATE
-        -fno-strict-aliasing
-        -fms-extensions
-    )
+    target_compile_options(MarioTennisRecompiled PRIVATE -march=nehalem)
+endif()
+
+target_compile_options(MarioTennisRecompiled PRIVATE -fno-strict-aliasing)
+
+if (MSVC)
+    target_compile_options(MarioTennisRecompiled PRIVATE -fms-extensions)
 endif()
 
 if (MSVC)
@@ -211,50 +215,6 @@ elseif (APPLE)
 endif()
 
 if (WIN32)
-    include(FetchContent)
-
-    if (DEFINED ENV{SDL2_VERSION})
-        set(SDL2_VERSION $ENV{SDL2_VERSION})
-    else()
-        set(SDL2_VERSION "2.30.3")
-    endif()
-
-    # Fetch SDL2 on windows
-    FetchContent_Declare(
-        sdl2
-        URL https://github.com/libsdl-org/SDL/releases/download/release-${SDL2_VERSION}/SDL2-devel-${SDL2_VERSION}-VC.zip
-    )
-    FetchContent_MakeAvailable(sdl2)
-    target_include_directories(MarioTennisRecompiled PRIVATE
-        ${sdl2_SOURCE_DIR}/include
-    )
-    target_link_directories(MarioTennisRecompiled PRIVATE
-        ${sdl2_SOURCE_DIR}/lib/x64
-    )
-
-    # Copy SDL2 and dxc DLLs to output folder as post build step
-    add_custom_command(TARGET MarioTennisRecompiled POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${sdl2_SOURCE_DIR}/lib/x64/SDL2.dll"
-            "${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib/dxc/bin/x64/dxil.dll"
-            "${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib/dxc/bin/x64/dxcompiler.dll"
-            $<TARGET_FILE_DIR:MarioTennisRecompiled>)
-
-    # The game runs from its own folder (see main.cpp), so it needs its UI assets and controller
-    # database next to the executable.
-    add_custom_command(TARGET MarioTennisRecompiled POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:MarioTennisRecompiled>/assets"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/recompcontrollerdb.txt" $<TARGET_FILE_DIR:MarioTennisRecompiled>
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/slang-shaders" "$<TARGET_FILE_DIR:MarioTennisRecompiled>/slang-shaders")
-
-    # Slang shaders need librashader.dll next to the exe (optional: without it the Shader option does nothing).
-    # Point LIBRASHADER_DLL at a build of https://github.com/SnowflakePowered/librashader (see README).
-    set(LIBRASHADER_DLL "" CACHE FILEPATH "Path to librashader.dll, copied next to the executable")
-    if (LIBRASHADER_DLL AND EXISTS "${LIBRASHADER_DLL}")
-        add_custom_command(TARGET MarioTennisRecompiled POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${LIBRASHADER_DLL}" $<TARGET_FILE_DIR:MarioTennisRecompiled>)
-    endif()
-
     set_target_properties(
         MarioTennisRecompiled
         PROPERTIES
@@ -263,9 +223,22 @@ if (WIN32)
             LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup"
             LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup"
     )
-
     target_sources(MarioTennisRecompiled PRIVATE ${CMAKE_SOURCE_DIR}/icons/app.rc)
-    target_link_libraries(MarioTennisRecompiled PRIVATE SDL2 Winmm.lib)
+    target_link_libraries(MarioTennisRecompiled PRIVATE Winmm.lib)
+endif()
+
+# Copy assets and controller database to output folder (Cross-platform)
+add_custom_command(TARGET MarioTennisRecompiled POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:MarioTennisRecompiled>/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/recompcontrollerdb.txt" $<TARGET_FILE_DIR:MarioTennisRecompiled>
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/slang-shaders" "$<TARGET_FILE_DIR:MarioTennisRecompiled>/slang-shaders")
+
+# Slang shaders need librashader.dll next to the exe (optional: without it the Shader option does nothing).
+# Point LIBRASHADER_DLL at a build of https://github.com/SnowflakePowered/librashader (see README).
+set(LIBRASHADER_DLL "" CACHE FILEPATH "Path to librashader.dll, copied next to the executable")
+if (LIBRASHADER_DLL AND EXISTS "${LIBRASHADER_DLL}")
+    add_custom_command(TARGET MarioTennisRecompiled POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${LIBRASHADER_DLL}" $<TARGET_FILE_DIR:MarioTennisRecompiled>)
 endif()
 
 if (APPLE)
@@ -303,14 +276,14 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     message(STATUS "FREETYPE_INCLUDE_DIRS = ${FREETYPE_INCLUDE_DIRS}")
     message(STATUS "FREETYPE_LIBRARIES = ${FREETYPE_LIBRARIES}")
 
-    include_directories(${FREETYPE_LIBRARIES})
+    include_directories(${FREETYPE_INCLUDE_DIRS})
     target_link_libraries(MarioTennisRecompiled PRIVATE ${FREETYPE_LIBRARIES} SDL2::SDL2)
 
     set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
     set(THREADS_PREFER_PTHREAD_FLAG TRUE)
     find_package(Threads REQUIRED)
 
-    target_link_libraries(MarioTennisRecompiled PRIVATE "-latomic -static-libstdc++" ${CMAKE_DL_LIBS} Threads::Threads)
+    target_link_libraries(MarioTennisRecompiled PRIVATE "-latomic" ${CMAKE_DL_LIBS} Threads::Threads)
 endif()
 
 if (NOT MT_LIVE_RECOMP)
@@ -332,6 +305,8 @@ target_link_libraries(MarioTennisRecompiled PRIVATE
     RmlUi::Debugger
     nfd
     lunasvg
+    SDL2::SDL2
+    ${FREETYPE_LIBRARIES}
 )
 
 # TODO fix the rt64 CMake script so that this doesn't need to be duplicated here
