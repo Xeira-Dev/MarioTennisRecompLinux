@@ -362,3 +362,9 @@ void mt_dump_all_stacks() {
 #else
 void mt_dump_all_stacks() {}
 #endif
+
+#ifndef _WIN32
+extern "C" void mt_print_game_stack(const void* pc, const void* sp, size_t bytes) {
+    fprintf(stderr, "[mt] Stack dump not implemented for this platform.\n");
+}
+#endif

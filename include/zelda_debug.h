@@ -1,10 +1,12 @@
 #ifndef __ZELDA_DEBUG_H__
 #define __ZELDA_DEBUG_H__
 
+#include <cstdint>
 #include <vector>
 #include <string>
 
 namespace zelda64 {
+
     struct SceneWarps {
         int index;
         std::string name;

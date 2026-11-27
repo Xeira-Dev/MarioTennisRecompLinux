@@ -375,13 +375,14 @@ std::vector<recomp::GameEntry> supported_games = {
         // 16 Kbit EEPROM: with 4K the game probes, rejects it and never reads or writes its save.
         .save_type = recomp::SaveType::Eep16k,
         .is_enabled = false,
+        .decompression_routine = nullptr,
         .has_compressed_code = false,
         // The runtime's 1 MiB boot copy lands here; mt::on_init then rebuilds RAM as the
         // cartridge boot stub would (clear + LZ-decompress main) before main runs.
         .entrypoint_address = (gpr)(int32_t)0x80031000,
         .entrypoint = recomp_entrypoint,
-        .on_init_callback = mt::on_init,
         .thread_create_callback = [](uint8_t* rdram, recomp_context*) { mt_prof_thread_created(rdram); },
+        .on_init_callback = mt::on_init,
     },
 };
 

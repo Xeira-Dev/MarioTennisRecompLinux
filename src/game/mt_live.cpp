@@ -11,7 +11,11 @@
 
 #include <algorithm>
 #include <chrono>
+#ifdef _WIN32
 #include <io.h>
+#else
+#include <unistd.h>
+#endif
 #include <cstdio>
 #include <cstring>
 #include <sstream>
@@ -135,6 +139,7 @@ namespace {
     // can't be written -- the normal case for a double-clicked GUI exe with no console. Point any missing
     // standard stream at NUL first.
     void ensure_writable_std_streams() {
+#ifdef _WIN32
         for (FILE* f : { stdout, stderr }) {
             int fd = _fileno(f);
             if (fd < 0 || _get_osfhandle(fd) == -1 || _get_osfhandle(fd) == -2) {
@@ -142,6 +147,10 @@ namespace {
                 freopen_s(&dummy, "NUL", "w", f);
             }
         }
+#else
+        if (fileno(stdout) < 0) freopen("/dev/null", "w", stdout);
+        if (fileno(stderr) < 0) freopen("/dev/null", "w", stderr);
+#endif
     }
 
     void build() {
